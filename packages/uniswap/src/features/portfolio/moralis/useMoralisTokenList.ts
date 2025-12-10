@@ -183,7 +183,24 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
 
           // 尝试从Moralis获取价格
           try {
-            const price = await fetchTokenPrice(token.address, chainName, process.env.NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY || '')
+            // 支持 Vite 和 Next.js 环境变量格式
+            const getEnvVar = (key: string): string => {
+              try {
+                // @ts-expect-error - import.meta.env is available in Vite runtime
+                if (typeof import.meta !== 'undefined' && import.meta.env?.[key]) {
+                  // @ts-expect-error - import.meta.env is available in Vite runtime
+                  return import.meta.env[key] as string
+                }
+              } catch {
+                // import.meta not available, fall through to process.env
+              }
+              return process.env[key] || ''
+            }
+            const apiKey = 
+              getEnvVar('VITE_MORALIS_PRIMARY_API_KEY') || 
+              getEnvVar('NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY') || 
+              ''
+            const price = await fetchTokenPrice(token.address, chainName, apiKey)
             return { token, priceUSD: price || null }
           } catch {
             return { token, priceUSD: null }

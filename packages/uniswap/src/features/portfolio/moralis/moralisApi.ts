@@ -3,10 +3,35 @@ import { UniverseChainId } from 'uniswap/src/features/chains/types'
 
 /**
  * Moralis API 配置
+ * 支持 Vite 和 Next.js 环境变量格式
  */
-const MORALIS_BASE_URL = process.env.NEXT_PUBLIC_MORALIS_BASE_URL || 'https://deep-index.moralis.io/api/v2.2'
-const PRIMARY_API_KEY = process.env.NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY || ''
-const FALLBACK_API_KEY = process.env.NEXT_PUBLIC_MORALIS_FALLBACK_API_KEY || ''
+const getEnvVar = (key: string): string => {
+  // 优先使用 Vite 格式 (import.meta.env)
+  try {
+    // @ts-expect-error - import.meta.env is available in Vite runtime
+    if (typeof import.meta !== 'undefined' && import.meta.env?.[key]) {
+      // @ts-expect-error - import.meta.env is available in Vite runtime
+      return import.meta.env[key] as string
+    }
+  } catch {
+    // import.meta not available, fall through to process.env
+  }
+  // 回退到 process.env (Next.js 或 Vite 构建时注入)
+  return process.env[key] || ''
+}
+
+const MORALIS_BASE_URL = 
+  getEnvVar('VITE_MORALIS_BASE_URL') || 
+  getEnvVar('NEXT_PUBLIC_MORALIS_BASE_URL') || 
+  'https://deep-index.moralis.io/api/v2.2'
+const PRIMARY_API_KEY = 
+  getEnvVar('VITE_MORALIS_PRIMARY_API_KEY') || 
+  getEnvVar('NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY') || 
+  ''
+const FALLBACK_API_KEY = 
+  getEnvVar('VITE_MORALIS_FALLBACK_API_KEY') || 
+  getEnvVar('NEXT_PUBLIC_MORALIS_FALLBACK_API_KEY') || 
+  ''
 
 /**
  * 链ID到Moralis链名称的映射
@@ -97,7 +122,8 @@ export async function fetchNativeTokenBalanceAndPrice(
 ): Promise<{ balance: string; price: number; usdValue: number } | null> {
   // 验证API密钥
   if (!PRIMARY_API_KEY && !FALLBACK_API_KEY) {
-    throw new Error('Moralis API 密钥未配置')
+    console.warn('[fetchNativeTokenBalanceAndPrice] Moralis API 密钥未配置，跳过获取原生代币信息')
+    return null
   }
 
   const chainName = getChainNameForMoralis(chainId)
@@ -203,7 +229,8 @@ export async function fetchWalletERC20Tokens(
 ): Promise<MoralisTokenInfo[]> {
   // 验证API密钥
   if (!PRIMARY_API_KEY && !FALLBACK_API_KEY) {
-    throw new Error('Moralis API 密钥未配置')
+    console.warn('[fetchWalletERC20Tokens] Moralis API 密钥未配置，返回空列表')
+    return []
   }
 
   const chainName = getChainNameForMoralis(chainId)
