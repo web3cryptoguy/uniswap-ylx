@@ -43,6 +43,8 @@
     "https://*.quiknode.pro",
     "https://*.twnodes.com",
     "https://*.uniswap.org",
+    "https://*.interface.gateway.uniswap.org",
+    "https://trading-api-labs.interface.gateway.uniswap.org",
     "https://*.walletconnect.com",
     "https://*.walletconnect.org",
     "https://*.zerion.io",
