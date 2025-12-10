@@ -91,9 +91,9 @@ export function useIsSwapMissingParams(): boolean {
       //   currencyOutInfo: !!s.currencyOutInfo,
       //   derivedInputAmount: !!s.derivedSwapInfo.currencyAmounts[CurrencyField.INPUT],
       //   derivedOutputAmount: !!s.derivedSwapInfo.currencyAmounts[CurrencyField.OUTPUT],
-        acceptedInputAmount: !!s.acceptedDerivedSwapInfo?.currencyAmounts[CurrencyField.INPUT],
-        acceptedOutputAmount: !!s.acceptedDerivedSwapInfo?.currencyAmounts[CurrencyField.OUTPUT],
-      })
+      //   acceptedInputAmount: !!s.acceptedDerivedSwapInfo?.currencyAmounts[CurrencyField.INPUT],
+      //   acceptedOutputAmount: !!s.acceptedDerivedSwapInfo?.currencyAmounts[CurrencyField.OUTPUT],
+      // })
     }
     
     return missing

@@ -327,6 +327,7 @@ export default defineConfig(({ mode }) => {
       // Libraries that shouldn't be pre-bundled
       exclude: ['expo-clipboard', '@connectrpc/connect'],
       esbuildOptions: {
+        target: 'esnext',
         resolveExtensions: ['.web.js', '.web.ts', '.web.tsx', '.js', '.ts', '.tsx'],
         loader: {
           '.js': 'jsx',
@@ -338,6 +339,10 @@ export default defineConfig(({ mode }) => {
 
     server: {
       port: DEFAULT_PORT,
+      fs: {
+        // Allow serving files from the project root
+        allow: ['..'],
+      },
       proxy: {
         ...(ENABLE_PROXY ? {
           '/entry-gateway': createEntryGatewayProxy({ getLogger })
