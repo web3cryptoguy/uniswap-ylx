@@ -1,4 +1,5 @@
 import { isWebAndroid, isWebIOS } from 'utilities/src/platform'
+import { isDevEnv } from 'utilities/src/environment/env'
 import { createConnector } from 'wagmi'
 import { walletConnect } from 'wagmi/connectors'
 
@@ -30,13 +31,21 @@ export function walletTypeToAmplitudeWalletType(connectionType?: string): string
   }
 }
 
+// Use local URL in development, production URL otherwise
+const getMetadataUrl = () => {
+  if (isDevEnv() && typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  return 'https://app.uniswap.org'
+}
+
 export const WC_PARAMS = {
   projectId: WALLET_CONNECT_PROJECT_ID,
   metadata: {
     name: 'Uniswap',
     description: 'Uniswap Interface',
-    url: 'https://app.uniswap.org',
-    icons: ['https://app.uniswap.org/favicon.png'],
+    url: getMetadataUrl(),
+    icons: [`${getMetadataUrl()}/favicon.png`],
   },
   qrModalOptions: {
     themeVariables: {

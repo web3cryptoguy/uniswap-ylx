@@ -51,12 +51,12 @@ export function useDebouncedGasInfo(): GasInfo {
   // 如果没有 gas 费用，提供一个基于链的默认 USD 估算值
   // 这些是基于典型 swap 交易的估算值（包括 approval 和 swap）
   const defaultGasFeeUSDByChain: Record<number, string> = {
-    1: '5.00', // Ethereum Mainnet
+    1: '1.20', // Ethereum Mainnet
     8453: '0.10', // Base
-    10: '0.50', // Optimism
-    42161: '0.50', // Arbitrum
+    10: '0.10', // Optimism
+    42161: '0.10', // Arbitrum
     137: '0.10', // Polygon
-    56: '0.20', // BSC
+    56: '0.120', // BSC
   }
   
   const { convertFiatAmountFormatted } = useLocalizationContext()
