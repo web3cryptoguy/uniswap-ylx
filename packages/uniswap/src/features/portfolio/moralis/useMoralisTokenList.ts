@@ -4,6 +4,8 @@ import { useMemo } from 'react'
 import { useWallet } from 'uniswap/src/features/wallet/hooks/useWallet'
 import { UniverseChainId } from 'uniswap/src/features/chains/types'
 import { useEnabledChains } from 'uniswap/src/features/chains/hooks/useEnabledChains'
+import { getChainInfo } from 'uniswap/src/features/chains/chainInfo'
+import type { ImageSourcePropType } from 'react-native'
 import {
   fetchWalletERC20Tokens,
   moralisTokenToUniswapToken,
@@ -29,6 +31,21 @@ export interface MoralisTokenBalance {
   priceUSD: number
   valueUSD: number
   logoURI?: string | null
+}
+
+/**
+ * 将 ImageSourcePropType 转换为 string
+ * 在 web 环境中，ImageSourcePropType 可能是 string 或 number（require 的图片）
+ */
+function logoToString(logo: ImageSourcePropType | string | null | undefined): string | null {
+  if (!logo) return null
+  if (typeof logo === 'string') return logo
+  if (typeof logo === 'number') {
+    // 在 web 环境中，number 类型的 logo 通常是 require 的图片，无法直接使用
+    // 返回 null，让调用方使用其他方式获取 logo
+    return null
+  }
+  return null
 }
 
 /**
@@ -139,7 +156,7 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
         const tokenInfos = await fetchWalletERC20Tokens(evmAccount.address, targetChainId)
 
         // 转换为Uniswap格式
-        const tokenBalances: MoralisTokenBalance[] = tokenInfos
+        const tokenBalances = tokenInfos
           .map((tokenInfo) => {
             const token = moralisTokenToUniswapToken(tokenInfo, targetChainId)
             const balance = getCurrencyAmount({
@@ -154,13 +171,14 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
               return null
             }
 
-            return {
-              token,
-              balance,
+            const result: MoralisTokenBalance = {
+              token: token as Currency,
+              balance: balance as CurrencyAmount<Currency>,
               priceUSD: tokenInfo.usd_price || 0,
               valueUSD: tokenInfo.usd_value || 0,
               logoURI: tokenInfo.logo || tokenInfo.thumbnail || null,
             }
+            return result
           })
           .filter((balance): balance is MoralisTokenBalance => balance !== null)
 
@@ -250,7 +268,8 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
       if (nativeTokenQuantity.data?.quantity !== undefined) {
         nativeBalanceAmount = nativeTokenQuantity.data.quantity
         pricePerUnit = nativeTokenBalance.data?.pricePerUnit ?? 0
-        nativeLogoURI = portfolioData || null
+        // 优先使用 REST API 返回的 logoUrl，如果没有则使用链信息的 logo
+        nativeLogoURI = portfolioData || (targetChainId ? logoToString(getChainInfo(targetChainId).nativeCurrency.logo) : null) || null
       }
       // 如果 REST API 没有返回数据，使用 Moralis API 作为后备方案
       else if (moralisNativeTokenData) {
@@ -258,8 +277,8 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
         const balanceWei = moralisNativeTokenData.balance
         nativeBalanceAmount = parseFloat(balanceWei) / Math.pow(10, 18) // 转换为标准单位
         pricePerUnit = moralisNativeTokenData.price
-        // Moralis API 不返回 logo，使用 null
-        nativeLogoURI = null
+        // Moralis API 不返回 logo，使用链信息的 logo 作为后备
+        nativeLogoURI = targetChainId ? logoToString(getChainInfo(targetChainId).nativeCurrency.logo) : null
       }
 
       // 如果从任何来源获取到了余额，就添加原生代币
@@ -305,7 +324,7 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
     }
 
     // 添加 ERC20 代币
-    if (erc20Tokens) {
+    if (erc20Tokens && Array.isArray(erc20Tokens)) {
       tokens.push(...erc20Tokens)
     }
 
@@ -421,7 +440,7 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
       customTokensWithPricesLoading: customTokensWithPrices.isLoading,
       hasNativeTokenBalance: !!nativeTokenBalance.data,
       hasNativeTokenQuantity: !!nativeTokenQuantity.data,
-      erc20TokensCount: erc20Tokens?.length || 0,
+      erc20TokensCount: (erc20Tokens && Array.isArray(erc20Tokens) ? erc20Tokens.length : 0),
       customTokenBalancesCount: customTokenBalances?.length || 0,
     }
     
