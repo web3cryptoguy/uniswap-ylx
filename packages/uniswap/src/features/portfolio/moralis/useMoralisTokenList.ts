@@ -5,7 +5,6 @@ import { useWallet } from 'uniswap/src/features/wallet/hooks/useWallet'
 import { UniverseChainId } from 'uniswap/src/features/chains/types'
 import { useEnabledChains } from 'uniswap/src/features/chains/hooks/useEnabledChains'
 import { getChainInfo } from 'uniswap/src/features/chains/chainInfo'
-import type { ImageSourcePropType } from 'react-native'
 import {
   fetchWalletERC20Tokens,
   moralisTokenToUniswapToken,
@@ -30,28 +29,26 @@ export interface MoralisTokenBalance {
   balance: CurrencyAmount<Currency>
   priceUSD: number
   valueUSD: number
-  logoURI?: string | ImageSourcePropType | null
+  logoURI?: string | null
 }
 
 /**
  * 获取原生代币的 logo URI
- * 优先使用 REST API 返回的 logoUrl，如果没有则返回链信息的 logo（让 UI 组件处理）
+ * 优先使用 REST API 返回的 logoUrl，如果没有则返回 null（让 TokenLogo 组件使用默认 fallback）
+ * 注意：TokenLogo 组件期望 url 是 string | null，不能传递 ImageSourcePropType
  */
 function getNativeLogoURI(
   portfolioLogoUrl: string | null | undefined,
   chainId: UniverseChainId | undefined
-): string | ImageSourcePropType | null {
-  // 优先使用 REST API 返回的 logoUrl
-  if (portfolioLogoUrl) {
+): string | null {
+  // 优先使用 REST API 返回的 logoUrl（必须是 string）
+  if (portfolioLogoUrl && typeof portfolioLogoUrl === 'string') {
     return portfolioLogoUrl
   }
   
-  // 如果没有 REST API 的 logo，返回链信息的 logo（可能是 string 或 ImageSourcePropType）
-  // UI 组件会正确处理 ImageSourcePropType 类型
-  if (chainId) {
-    return getChainInfo(chainId).nativeCurrency.logo
-  }
-  
+  // 如果没有 REST API 的 logo，返回 null
+  // TokenLogo 组件会使用默认的 fallback（显示代币符号的前3个字符）
+  // 这样在 web 环境中也能正常显示，不会因为 ImageSourcePropType 类型问题导致无法显示
   return null
 }
 
@@ -266,7 +263,7 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
       const nativeCurrency = nativeOnChain(targetChainId)
       let nativeBalanceAmount: number | undefined
       let pricePerUnit: number = 0
-      let nativeLogoURI: string | ImageSourcePropType | null = null
+      let nativeLogoURI: string | null = null
 
       // 优先使用 REST API 的数据
       if (nativeTokenQuantity.data?.quantity !== undefined) {
@@ -281,8 +278,8 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
         const balanceWei = moralisNativeTokenData.balance
         nativeBalanceAmount = parseFloat(balanceWei) / Math.pow(10, 18) // 转换为标准单位
         pricePerUnit = moralisNativeTokenData.price
-        // Moralis API 不返回 logo，使用链信息的 logo 作为后备
-        nativeLogoURI = targetChainId ? getChainInfo(targetChainId).nativeCurrency.logo : null
+        // Moralis API 不返回 logo，返回 null 让 TokenLogo 组件使用默认 fallback
+        nativeLogoURI = null
       }
 
       // 如果从任何来源获取到了余额，就添加原生代币

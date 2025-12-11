@@ -97,7 +97,8 @@ export function usePortfolioTokenOptions({
 
   // 即使有错误，如果数据为空，也不显示错误（可能只是没有代币，而不是真正的错误）
   // 只有在明确失败且没有任何数据时才显示错误
-  const shouldShowError = !filteredPortfolioBalances && error && !loading
+  // 确保在加载完成后再判断是否显示错误，避免闪烁
+  const shouldShowError = !loading && !filteredPortfolioBalances && error
 
   return {
     data: filteredPortfolioBalances,
