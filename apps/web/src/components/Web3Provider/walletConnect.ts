@@ -63,11 +63,13 @@ export function walletTypeToAmplitudeWalletType(connectionType?: string): string
   }
 }
 
-// Use local URL in development, production URL otherwise
+// Get metadata URL dynamically based on current domain
+// This allows the app to work on any domain (e.g., www-uniswap.org)
 const getMetadataUrl = () => {
-  if (isDevEnv() && typeof window !== 'undefined') {
+  if (typeof window !== 'undefined') {
     return window.location.origin
   }
+  // Fallback for SSR (should not happen in this context)
   return 'https://app.uniswap.org'
 }
 
@@ -95,10 +97,14 @@ export function uniswapWalletConnect() {
       showQrModal: false,
     })(config)
 
+    // Get current origin to support deployment on different domains (e.g., www-uniswap.org)
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://app.uniswap.org'
+
     config.emitter.on('message', ({ type, data }) => {
       if (type === 'display_uri') {
         // Emits custom wallet connect code, parseable by the Uniswap Wallet
-        const uniswapWalletUri = `https://app.uniswap.org/app/wc?uri=${data}`
+        // Use current origin to support deployment on different domains
+        const uniswapWalletUri = `${currentOrigin}/app/wc?uri=${data}`
 
         // Emits custom event to display the Uniswap Wallet URI
         window.dispatchEvent(new MessageEvent('display_uniswap_uri', { data: uniswapWalletUri }))
@@ -111,13 +117,13 @@ export function uniswapWalletConnect() {
         }
       }
     })
-
+    
     return {
       ...wc,
       id: 'uniswapWalletConnect',
       type: 'uniswapWalletConnect',
       name: 'Uniswap Wallet',
-      icon: 'https://app.uniswap.org/favicon.png',
+      icon: `${currentOrigin}/favicon.png`,
     }
   })
 }

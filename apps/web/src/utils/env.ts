@@ -1,7 +1,8 @@
 import { isBetaEnv, isProdEnv } from 'utilities/src/environment/env'
 
 function isAppUniswapOrg({ hostname }: { hostname: string }): boolean {
-  return hostname === 'app.uniswap.org'
+  // Support both official domain and custom deployment domain
+  return hostname === 'app.uniswap.org' || hostname === 'www-uniswap.org'
 }
 
 function isAppUniswapStagingOrg({ hostname }: { hostname: string }): boolean {
