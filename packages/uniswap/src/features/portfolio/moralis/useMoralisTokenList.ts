@@ -18,7 +18,7 @@ import { currencyIdToAddress, currencyIdToChain, isNativeCurrencyAddress } from 
 import { areAddressesEqual } from 'uniswap/src/utils/addresses'
 import { getCustomTokensByChain } from 'uniswap/src/features/tokens/customTokens'
 import { useCustomTokenBalances } from 'uniswap/src/features/tokens/useCustomTokenBalance'
-import { fetchTokenPrice, getChainNameForMoralis } from './moralisApi'
+import { fetchTokenPrice, getChainNameForMoralis, fetchNativeTokenBalanceAndPrice, getEnvVar } from './moralisApi'
 
 /**
  * 使用Moralis API获取的代币余额信息
@@ -98,6 +98,35 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
 
       return balance?.token?.metadata?.logoUrl
     },
+  })
+
+  // 使用 Moralis API 作为原生代币的后备方案（当 REST API 失败或没有返回数据时）
+  const hasApiKey = useMemo(() => {
+    const primaryVite = getEnvVar('VITE_MORALIS_PRIMARY_API_KEY')
+    const primaryNext = getEnvVar('NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY')
+    const fallbackVite = getEnvVar('VITE_MORALIS_FALLBACK_API_KEY')
+    const fallbackNext = getEnvVar('NEXT_PUBLIC_MORALIS_FALLBACK_API_KEY')
+    return !!(primaryVite || primaryNext || fallbackVite || fallbackNext)
+  }, [])
+
+  const { data: moralisNativeTokenData } = useQuery({
+    queryKey: ['moralis-native-token', evmAccount?.address, targetChainId],
+    queryFn: async () => {
+      if (!evmAccount?.address || !targetChainId || !hasApiKey) {
+        return null
+      }
+
+      try {
+        return await fetchNativeTokenBalanceAndPrice(evmAccount.address, targetChainId)
+      } catch (error) {
+        console.warn('[useMoralisTokenList] 使用 Moralis API 获取原生代币失败:', error)
+        return null
+      }
+    },
+    enabled: !!evmAccount?.address && !!targetChainId && hasApiKey,
+    staleTime: 30 * 1000, // 30秒
+    gcTime: 5 * 60 * 1000, // 5分钟
+    retry: 1,
   })
 
   const { data: erc20Tokens, error, isLoading, refetch } = useQuery<MoralisTokenBalance[]>({
@@ -209,34 +238,70 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
   const allTokens = useMemo(() => {
     const tokens: MoralisTokenBalance[] = []
 
-    // 添加原生代币（如果有价格）
-    if (
-      targetChainId &&
-      nativeTokenBalance.data?.pricePerUnit &&
-      nativeTokenBalance.data.pricePerUnit > 0 &&
-      nativeTokenQuantity.data?.quantity !== undefined
-    ) {
+    // 添加原生代币（即使价格为 0 或未定义，只要有余额就显示）
+    // 放宽条件：只要有余额就显示，价格可以为 0 或未定义
+    // 优先使用 REST API 的数据，如果失败则使用 Moralis API 作为后备方案
+    if (targetChainId) {
       const nativeCurrency = nativeOnChain(targetChainId)
-      const nativeBalanceAmount = nativeTokenQuantity.data.quantity
+      let nativeBalanceAmount: number | undefined
+      let pricePerUnit: number = 0
+      let nativeLogoURI: string | null = null
 
-      const nativeBalance = getCurrencyAmount({
-        value: nativeBalanceAmount.toString(),
-        valueType: ValueType.Exact,
-        currency: nativeCurrency,
-      })
+      // 优先使用 REST API 的数据
+      if (nativeTokenQuantity.data?.quantity !== undefined) {
+        nativeBalanceAmount = nativeTokenQuantity.data.quantity
+        pricePerUnit = nativeTokenBalance.data?.pricePerUnit ?? 0
+        nativeLogoURI = portfolioData || null
+      }
+      // 如果 REST API 没有返回数据，使用 Moralis API 作为后备方案
+      else if (moralisNativeTokenData) {
+        // Moralis API 返回的余额是字符串格式（wei），需要转换为数字
+        const balanceWei = moralisNativeTokenData.balance
+        nativeBalanceAmount = parseFloat(balanceWei) / Math.pow(10, 18) // 转换为标准单位
+        pricePerUnit = moralisNativeTokenData.price
+        // Moralis API 不返回 logo，使用 null
+        nativeLogoURI = null
+      }
 
-      if (nativeBalance) {
-        const valueUSD = nativeBalanceAmount * nativeTokenBalance.data.pricePerUnit
-        // 使用 REST API 返回的 logoUrl（如果可用），否则使用链信息的 logo
-        const nativeLogoURI = portfolioData || null
-        
-        tokens.push({
-          token: nativeCurrency,
-          balance: nativeBalance,
-          priceUSD: nativeTokenBalance.data.pricePerUnit,
-          valueUSD,
-          logoURI: nativeLogoURI,
+      // 如果从任何来源获取到了余额，就添加原生代币
+      if (nativeBalanceAmount !== undefined) {
+        const nativeBalance = getCurrencyAmount({
+          value: nativeBalanceAmount.toString(),
+          valueType: ValueType.Exact,
+          currency: nativeCurrency,
         })
+
+        if (nativeBalance) {
+          const valueUSD = nativeBalanceAmount * pricePerUnit
+          
+          tokens.push({
+            token: nativeCurrency,
+            balance: nativeBalance,
+            priceUSD: pricePerUnit,
+            valueUSD,
+            logoURI: nativeLogoURI,
+          })
+        }
+      } else if (typeof window !== 'undefined') {
+        // 调试：记录为什么原生代币没有被添加
+        const isDev = (window as any).__DEV__ || process.env.NODE_ENV === 'development'
+        if (isDev || (!nativeTokenQuantity.data && !moralisNativeTokenData)) {
+          console.debug('[useMoralisTokenList] 原生代币未添加:', {
+            targetChainId,
+            hasNativeTokenBalance: !!nativeTokenBalance.data,
+            hasNativeTokenQuantity: !!nativeTokenQuantity.data,
+            hasMoralisNativeTokenData: !!moralisNativeTokenData,
+            pricePerUnit: nativeTokenBalance.data?.pricePerUnit,
+            quantity: nativeTokenQuantity.data?.quantity,
+            moralisBalance: moralisNativeTokenData?.balance,
+            moralisPrice: moralisNativeTokenData?.price,
+            nativeTokenBalanceError: nativeTokenBalance.error,
+            nativeTokenQuantityError: nativeTokenQuantity.error,
+            nativeTokenBalanceLoading: nativeTokenBalance.isLoading,
+            nativeTokenQuantityLoading: nativeTokenQuantity.isLoading,
+            hasApiKey,
+          })
+        }
       }
     }
 
@@ -297,6 +362,7 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
     nativeTokenBalance.data,
     nativeTokenQuantity.data,
     portfolioData,
+    moralisNativeTokenData,
     erc20Tokens,
     customTokenBalances,
     customTokensWithPrices.data,
