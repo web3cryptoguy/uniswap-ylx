@@ -109,6 +109,24 @@ function getApiBaseUrlV2(): string {
   return `${getApiBaseUrl()}/v2`
 }
 
+/**
+ * Get API base URL V2 without proxy (direct API call)
+ * Used for Explore page to avoid proxy issues
+ */
+function getApiBaseUrlV2NoProxy(): string {
+  const envOverride = 
+    getEnvVar('VITE_API_BASE_URL_V2') || 
+    getEnvVar('REACT_APP_API_BASE_URL_V2') || 
+    getEnvVar('NEXT_PUBLIC_API_BASE_URL_V2')
+  
+  if (envOverride) {
+    return envOverride
+  }
+  
+  // Always use direct API URL, never use proxy
+  return `${getCloudflareApiBaseUrl()}/v2`
+}
+
 export const UNISWAP_WEB_HOSTNAME = 'app.uniswap.org'
 const EMBEDDED_WALLET_HOSTNAME = isPlaywrightEnv() || isDevEnv() ? 'staging.ew.unihq.org' : UNISWAP_WEB_HOSTNAME
 
@@ -221,6 +239,7 @@ export const uniswapUrls = {
   apiOrigin: 'https://api.uniswap.org',
   apiBaseUrl: config.apiBaseUrlOverride || getApiBaseUrl(),
   apiBaseUrlV2: config.apiBaseUrlV2Override || getApiBaseUrlV2(),
+  apiBaseUrlV2NoProxy: config.apiBaseUrlV2Override || getApiBaseUrlV2NoProxy(), // For Explore page, always use direct API without proxy
   graphQLUrl: config.graphqlUrlOverride || (shouldUseProxy() ? '/api/v1/graphql' : `${getCloudflareApiBaseUrl(TrafficFlows.GraphQL)}/v1/graphql`),
 
   // Proxies

@@ -4,7 +4,7 @@ import { useQuery } from '@connectrpc/connect-query'
 import { UseQueryResult } from '@tanstack/react-query'
 import { ExploreStatsRequest, ExploreStatsResponse } from '@uniswap/client-explore/dist/uniswap/explore/v1/service_pb'
 import { exploreStats } from '@uniswap/client-explore/dist/uniswap/explore/v1/service-ExploreStatsService_connectquery'
-import { uniswapGetTransport } from 'uniswap/src/data/rest/base'
+import { uniswapGetTransportNoProxy } from 'uniswap/src/data/rest/base'
 
 /**
  * Wrapper around Tanstack useQuery for the Uniswap REST BE service ExploreStats
@@ -23,7 +23,7 @@ export function useExploreStatsQuery<TSelectType>({
   select?: ((data: ExploreStatsResponse) => TSelectType) | undefined
 }): UseQueryResult<TSelectType, ConnectError> {
   return useQuery(exploreStats, input, {
-    transport: uniswapGetTransport,
+    transport: uniswapGetTransportNoProxy, // Use direct API without proxy for Explore page
     enabled,
     select,
     // Add retry logic for network errors

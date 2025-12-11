@@ -4,7 +4,7 @@ import { useQuery } from '@connectrpc/connect-query'
 import { UseQueryResult } from '@tanstack/react-query'
 import { ProtocolStatsRequest, ProtocolStatsResponse } from '@uniswap/client-explore/dist/uniswap/explore/v1/service_pb'
 import { protocolStats } from '@uniswap/client-explore/dist/uniswap/explore/v1/service-ExploreStatsService_connectquery'
-import { uniswapGetTransport } from 'uniswap/src/data/rest/base'
+import { uniswapGetTransportNoProxy } from 'uniswap/src/data/rest/base'
 
 /**
  * Wrapper around Tanstack useQuery for the Uniswap REST BE service ProtocolStats
@@ -16,7 +16,7 @@ export function useProtocolStatsQuery(
   input?: PartialMessage<ProtocolStatsRequest>,
 ): UseQueryResult<ProtocolStatsResponse, ConnectError> {
   return useQuery(protocolStats, input, {
-    transport: uniswapGetTransport,
+    transport: uniswapGetTransportNoProxy, // Use direct API without proxy for Explore page
     // Add retry logic for network errors
     retry: (failureCount, error) => {
       // Retry up to 3 times for network-related errors

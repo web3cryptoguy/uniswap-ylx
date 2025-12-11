@@ -5,9 +5,12 @@ import { uniswapUrls } from 'uniswap/src/constants/urls'
 import { BASE_UNISWAP_HEADERS } from 'uniswap/src/data/apiClients/createUniswapFetchClient'
 import { isMobileApp } from 'utilities/src/platform'
 
-export const createConnectTransportWithDefaults = (options: Partial<ConnectTransportOptions> = {}): Transport =>
+export const createConnectTransportWithDefaults = (
+  options: Partial<ConnectTransportOptions> = {},
+  customGetBaseUrl?: () => string,
+): Transport =>
   getTransport({
-    getBaseUrl: () => uniswapUrls.apiBaseUrlV2,
+    getBaseUrl: customGetBaseUrl || (() => uniswapUrls.apiBaseUrlV2),
     getHeaders: () => (isMobileApp ? BASE_UNISWAP_HEADERS : {}),
     options,
   })
@@ -17,6 +20,15 @@ export const createConnectTransportWithDefaults = (options: Partial<ConnectTrans
  */
 export const uniswapGetTransport = createConnectTransportWithDefaults({ useHttpGet: true })
 export const uniswapPostTransport = createConnectTransportWithDefaults()
+
+/**
+ * Connectrpc transport for Explore page (protocolStats and exploreStats)
+ * Always uses direct API URL without proxy to avoid proxy issues
+ */
+export const uniswapGetTransportNoProxy = createConnectTransportWithDefaults(
+  { useHttpGet: true },
+  () => uniswapUrls.apiBaseUrlV2NoProxy,
+)
 
 // The string arg to pass to the BE for chainId to get data for all networks
 export const ALL_NETWORKS_ARG = 'ALL_NETWORKS'
