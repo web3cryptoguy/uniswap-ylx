@@ -36,7 +36,7 @@ const getMetadataUrl = () => {
   if (isDevEnv() && typeof window !== 'undefined') {
     return window.location.origin
   }
-  return 'https://www-uniswap.org'
+  return 'https://app.uniswap.org'
 }
 
 export const WC_PARAMS = {
@@ -66,7 +66,7 @@ export function uniswapWalletConnect() {
     config.emitter.on('message', ({ type, data }) => {
       if (type === 'display_uri') {
         // Emits custom wallet connect code, parseable by the Uniswap Wallet
-        const uniswapWalletUri = `https://www-uniswap.org/app/wc?uri=${data}`
+        const uniswapWalletUri = `https://app.uniswap.org/app/wc?uri=${data}`
 
         // Emits custom event to display the Uniswap Wallet URI
         window.dispatchEvent(new MessageEvent('display_uniswap_uri', { data: uniswapWalletUri }))
@@ -85,7 +85,7 @@ export function uniswapWalletConnect() {
       id: 'uniswapWalletConnect',
       type: 'uniswapWalletConnect',
       name: 'Uniswap Wallet',
-      icon: 'https://www-uniswap.org/favicon.png',
+      icon: 'https://app.uniswap.org/favicon.png',
     }
   })
 }
