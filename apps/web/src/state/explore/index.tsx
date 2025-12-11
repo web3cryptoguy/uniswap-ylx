@@ -65,6 +65,19 @@ export function ExploreContextProvider({
     chainId: isSupportedChain ? chainId.toString() : ALL_NETWORKS_ARG,
   })
 
+  // Log errors for debugging in production
+  if (exploreStatsError) {
+    // Only log in non-production or when explicitly enabled
+    if (typeof window !== 'undefined' && (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1'))) {
+      console.error('Explore stats query error:', exploreStatsError)
+    }
+  }
+  if (protocolStatsError) {
+    if (typeof window !== 'undefined' && (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1'))) {
+      console.error('Protocol stats query error:', protocolStatsError)
+    }
+  }
+
   const exploreContext = useMemo(() => {
     return {
       exploreStats: {

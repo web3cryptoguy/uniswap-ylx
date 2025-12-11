@@ -22,5 +22,36 @@ export function useExploreStatsQuery<TSelectType>({
   enabled?: boolean
   select?: ((data: ExploreStatsResponse) => TSelectType) | undefined
 }): UseQueryResult<TSelectType, ConnectError> {
-  return useQuery(exploreStats, input, { transport: uniswapGetTransport, enabled, select })
+  return useQuery(exploreStats, input, {
+    transport: uniswapGetTransport,
+    enabled,
+    select,
+    // Add retry logic for network errors
+    retry: (failureCount, error) => {
+      // Retry up to 3 times for network-related errors
+      if (failureCount >= 3) {
+        return false
+      }
+      // Retry for network errors, connection errors, and 5xx errors
+      if (error instanceof ConnectError) {
+        const code = error.code
+        // Retry for network errors, unavailable, and internal errors
+        if (
+          code === 'unavailable' ||
+          code === 'internal' ||
+          code === 'deadline_exceeded' ||
+          code === 'resource_exhausted' ||
+          code === 'aborted'
+        ) {
+          return true
+        }
+      }
+      // Also retry for fetch errors (network issues)
+      if (error instanceof Error && error.name === 'NetworkError') {
+        return true
+      }
+      return false
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+  })
 }
