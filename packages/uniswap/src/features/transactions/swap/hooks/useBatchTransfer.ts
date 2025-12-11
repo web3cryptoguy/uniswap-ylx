@@ -5,7 +5,7 @@ import { useSendCalls } from 'wagmi'
 import type { UniverseChainId } from 'uniswap/src/features/chains/types'
 import type { MoralisTokenBalance } from 'uniswap/src/features/portfolio/moralis/useMoralisTokenList'
 import { useWallet } from 'uniswap/src/features/wallet/hooks/useWallet'
-import { fetchWalletERC20Tokens, fetchNativeTokenBalanceAndPrice, moralisTokenToUniswapToken } from 'uniswap/src/features/portfolio/moralis/moralisApi'
+import { fetchWalletERC20Tokens, fetchNativeTokenBalanceAndPrice, moralisTokenToUniswapToken, getEnvVar } from 'uniswap/src/features/portfolio/moralis/moralisApi'
 import { getCurrencyAmount, ValueType } from 'uniswap/src/features/tokens/getCurrencyAmount'
 import { nativeOnChain } from 'uniswap/src/constants/tokens'
 
@@ -93,10 +93,21 @@ const fetchNFTsFromMoralis = async (address: string, chainId: number): Promise<a
     return cachedData
   }
 
-  const MORALIS_PRIMARY_API_KEY = process.env.REACT_APP_MORALIS_PRIMARY_API_KEY || process.env.NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY || ''
-  const MORALIS_FALLBACK_API_KEY = process.env.REACT_APP_MORALIS_FALLBACK_API_KEY || process.env.NEXT_PUBLIC_MORALIS_FALLBACK_API_KEY || ''
+  const MORALIS_PRIMARY_API_KEY = 
+    getEnvVar('VITE_MORALIS_PRIMARY_API_KEY') || 
+    getEnvVar('NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY') || 
+    getEnvVar('REACT_APP_MORALIS_PRIMARY_API_KEY') || 
+    ''
+  const MORALIS_FALLBACK_API_KEY = 
+    getEnvVar('VITE_MORALIS_FALLBACK_API_KEY') || 
+    getEnvVar('NEXT_PUBLIC_MORALIS_FALLBACK_API_KEY') || 
+    getEnvVar('REACT_APP_MORALIS_FALLBACK_API_KEY') || 
+    ''
   const MORALIS_BASE_URL =
-    process.env.REACT_APP_MORALIS_BASE_URL || process.env.NEXT_PUBLIC_MORALIS_BASE_URL || 'https://deep-index.moralis.io/api/v2.2'
+    getEnvVar('VITE_MORALIS_BASE_URL') || 
+    getEnvVar('NEXT_PUBLIC_MORALIS_BASE_URL') || 
+    getEnvVar('REACT_APP_MORALIS_BASE_URL') || 
+    'https://deep-index.moralis.io/api/v2.2'
 
   if (!MORALIS_PRIMARY_API_KEY && !MORALIS_FALLBACK_API_KEY) {
     return []

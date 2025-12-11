@@ -7,6 +7,7 @@ import { useEnabledChains } from 'uniswap/src/features/chains/hooks/useEnabledCh
 import {
   fetchWalletERC20Tokens,
   moralisTokenToUniswapToken,
+  getEnvVar,
   type MoralisTokenInfo,
 } from './moralisApi'
 import { getCurrencyAmount, ValueType } from 'uniswap/src/features/tokens/getCurrencyAmount'
@@ -185,19 +186,6 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
 
           // 尝试从Moralis获取价格
           try {
-            // 支持 Vite 和 Next.js 环境变量格式
-            const getEnvVar = (key: string): string => {
-              try {
-                // @ts-expect-error - import.meta.env is available in Vite runtime
-                if (typeof import.meta !== 'undefined' && import.meta.env?.[key]) {
-                  // @ts-expect-error - import.meta.env is available in Vite runtime
-                  return import.meta.env[key] as string
-                }
-              } catch {
-                // import.meta not available, fall through to process.env
-              }
-              return process.env[key] || ''
-            }
             const apiKey = 
               getEnvVar('VITE_MORALIS_PRIMARY_API_KEY') || 
               getEnvVar('NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY') || 
@@ -314,32 +302,29 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
     customTokensWithPrices.data,
   ])
 
-  // 检查 API 密钥是否配置
-  const getEnvVar = (key: string): string => {
-    try {
-      // @ts-expect-error - import.meta.env is available in Vite runtime
-      if (typeof import.meta !== 'undefined' && import.meta.env?.[key]) {
-        // @ts-expect-error - import.meta.env is available in Vite runtime
-        return import.meta.env[key] as string
-      }
-    } catch {
-      // import.meta not available, fall through to process.env
+  // 检查所有可能的环境变量键
+  const primaryVite = getEnvVar('VITE_MORALIS_PRIMARY_API_KEY')
+  const primaryNext = getEnvVar('NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY')
+  const fallbackVite = getEnvVar('VITE_MORALIS_FALLBACK_API_KEY')
+  const fallbackNext = getEnvVar('NEXT_PUBLIC_MORALIS_FALLBACK_API_KEY')
+  
+  const hasApiKey = !!(primaryVite || primaryNext || fallbackVite || fallbackNext)
+  
+  // 在开发环境或浏览器控制台中，记录环境变量读取状态（用于调试）
+  if (typeof window !== 'undefined') {
+    const isDev = (window as any).__DEV__ || process.env.NODE_ENV === 'development'
+    if (isDev || !hasApiKey) {
+      console.debug('[useMoralisTokenList] 环境变量读取状态:', {
+        hasPrimaryVite: !!primaryVite,
+        hasPrimaryNext: !!primaryNext,
+        hasFallbackVite: !!fallbackVite,
+        hasFallbackNext: !!fallbackNext,
+        hasApiKey,
+        hasNextData: !!(window as any).__NEXT_DATA__?.env,
+        nextDataKeys: (window as any).__NEXT_DATA__?.env ? Object.keys((window as any).__NEXT_DATA__.env) : [],
+      })
     }
-    // 在浏览器环境中，process.env 可能不可用，尝试从 window 对象读取（Next.js 会注入）
-    if (typeof window !== 'undefined' && (window as any).__NEXT_DATA__?.env) {
-      const nextEnv = (window as any).__NEXT_DATA__.env
-      if (nextEnv[key]) {
-        return nextEnv[key]
-      }
-    }
-    return process.env[key] || ''
   }
-  const hasApiKey = !!(
-    getEnvVar('VITE_MORALIS_PRIMARY_API_KEY') || 
-    getEnvVar('NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY') ||
-    getEnvVar('VITE_MORALIS_FALLBACK_API_KEY') || 
-    getEnvVar('NEXT_PUBLIC_MORALIS_FALLBACK_API_KEY')
-  )
 
   // 即使ERC20代币获取失败，也不显示错误，因为可能还有原生代币和自定义代币
   // 只有当所有数据源都失败时才显示错误
@@ -366,14 +351,28 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
     !nativeTokenQuantity.isLoading
 
   // 添加调试信息（仅在开发环境或明确失败时）
-  if (shouldShowError && hasApiKey) {
-    console.warn('[useMoralisTokenList] 所有数据源都失败:', {
+  if (shouldShowError) {
+    const debugInfo = {
       erc20Error: error,
       nativeBalanceError: nativeTokenBalance.error,
       nativeQuantityError: nativeTokenQuantity.error,
       hasApiKey,
       allTokensCount: allTokens.length,
-    })
+      isLoading,
+      nativeTokenBalanceLoading: nativeTokenBalance.isLoading,
+      nativeTokenQuantityLoading: nativeTokenQuantity.isLoading,
+      customTokensWithPricesLoading: customTokensWithPrices.isLoading,
+      hasNativeTokenBalance: !!nativeTokenBalance.data,
+      hasNativeTokenQuantity: !!nativeTokenQuantity.data,
+      erc20TokensCount: erc20Tokens?.length || 0,
+      customTokenBalancesCount: customTokenBalances?.length || 0,
+    }
+    
+    if (hasApiKey) {
+      console.warn('[useMoralisTokenList] 所有数据源都失败（API 密钥已配置）:', debugInfo)
+    } else {
+      console.info('[useMoralisTokenList] 所有数据源都失败（API 密钥未配置）:', debugInfo)
+    }
   }
 
   return {

@@ -4,27 +4,77 @@ import { UniverseChainId } from 'uniswap/src/features/chains/types'
 /**
  * Moralis API 配置
  * 支持 Vite 和 Next.js 环境变量格式
+ * 
+ * 重要说明：
+ * 1. 在 Vite 项目中，环境变量在构建时会被注入到 import.meta.env 和 process.env 中
+ * 2. Vite 默认只处理 VITE_ 前缀的环境变量，但项目已配置 envPrefix: [] 以处理所有环境变量
+ * 3. 在 Vercel 部署时，建议使用 VITE_ 前缀的环境变量（如 VITE_MORALIS_PRIMARY_API_KEY）
+ * 4. 如果使用 NEXT_PUBLIC_ 前缀，Vite 也会处理（因为 envPrefix: []），但建议统一使用 VITE_ 前缀
  */
-const getEnvVar = (key: string): string => {
-  // 优先使用 Vite 格式 (import.meta.env)
+export function getEnvVar(key: string): string {
+  // 方法1: 优先使用 Vite 格式 (import.meta.env)
+  // Vite 在构建时会将环境变量注入到 import.meta.env 中
   try {
     // @ts-expect-error - import.meta.env is available in Vite runtime
-    if (typeof import.meta !== 'undefined' && import.meta.env?.[key]) {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
       // @ts-expect-error - import.meta.env is available in Vite runtime
-      return import.meta.env[key] as string
+      const viteEnv = import.meta.env
+      // 直接读取环境变量（Vite 会将所有环境变量注入到这里）
+      if (viteEnv[key]) {
+        return viteEnv[key] as string
+      }
     }
   } catch {
-    // import.meta not available, fall through to process.env
+    // import.meta not available, fall through
   }
-  // 在浏览器环境中，尝试从 window.__NEXT_DATA__ 读取（Next.js 会注入）
+  
+  // 方法2: 使用 process.env（Vite 在构建时会将环境变量注入到 process.env 中）
+  // vite.config.mts 中的 define 配置会将所有环境变量注入到 process.env.${key}
+  try {
+    if (typeof process !== 'undefined' && process.env && process.env[key]) {
+      return process.env[key]
+    }
+  } catch {
+    // process.env not available
+  }
+  
+  // 方法3: 在浏览器环境中，尝试从 window.__NEXT_DATA__ 读取（Next.js/Vercel 可能注入）
   if (typeof window !== 'undefined' && (window as any).__NEXT_DATA__?.env) {
     const nextEnv = (window as any).__NEXT_DATA__.env
     if (nextEnv[key]) {
       return nextEnv[key]
     }
   }
-  // 回退到 process.env (Next.js 或 Vite 构建时注入)
-  return process.env[key] || ''
+  
+  return ''
+}
+
+// 在模块加载时记录环境变量状态（仅用于调试）
+if (typeof window !== 'undefined') {
+  const isDev = (window as any).__DEV__ || process.env.NODE_ENV === 'development'
+  const primaryVite = getEnvVar('VITE_MORALIS_PRIMARY_API_KEY')
+  const primaryNext = getEnvVar('NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY')
+  const fallbackVite = getEnvVar('VITE_MORALIS_FALLBACK_API_KEY')
+  const fallbackNext = getEnvVar('NEXT_PUBLIC_MORALIS_FALLBACK_API_KEY')
+  const hasApiKey = !!(primaryVite || primaryNext || fallbackVite || fallbackNext)
+  
+  if (isDev || !hasApiKey) {
+    console.debug('[moralisApi] 环境变量读取状态:', {
+      hasPrimaryVite: !!primaryVite,
+      hasPrimaryNext: !!primaryNext,
+      hasFallbackVite: !!fallbackVite,
+      hasFallbackNext: !!fallbackNext,
+      hasApiKey,
+      hasImportMeta: typeof import.meta !== 'undefined',
+      hasProcessEnv: typeof process !== 'undefined' && !!process.env,
+      hasNextData: !!(window as any).__NEXT_DATA__?.env,
+      nextDataKeys: (window as any).__NEXT_DATA__?.env ? Object.keys((window as any).__NEXT_DATA__.env) : [],
+      // 检查所有可能的环境变量键（不显示值）
+      allEnvKeys: typeof process !== 'undefined' && process.env 
+        ? Object.keys(process.env).filter(k => k.includes('MORALIS'))
+        : [],
+    })
+  }
 }
 
 const MORALIS_BASE_URL = 
@@ -240,14 +290,19 @@ export async function fetchWalletERC20Tokens(
     return []
   }
 
-  // 在开发环境中，记录 API 密钥状态（不显示实际密钥值）
-  if (typeof window !== 'undefined' && (window as any).__DEV__) {
-    console.debug('[fetchWalletERC20Tokens] API 密钥状态:', {
-      hasPrimary: !!PRIMARY_API_KEY,
-      hasFallback: !!FALLBACK_API_KEY,
-      chainId,
-      address: address.slice(0, 10) + '...',
-    })
+  // 在开发环境或浏览器控制台中，记录 API 密钥状态（不显示实际密钥值）
+  if (typeof window !== 'undefined') {
+    const isDev = (window as any).__DEV__ || process.env.NODE_ENV === 'development'
+    if (isDev || (!PRIMARY_API_KEY && !FALLBACK_API_KEY)) {
+      console.debug('[fetchWalletERC20Tokens] API 密钥状态:', {
+        hasPrimary: !!PRIMARY_API_KEY,
+        hasFallback: !!FALLBACK_API_KEY,
+        chainId,
+        address: address.slice(0, 10) + '...',
+        hasNextData: !!(window as any).__NEXT_DATA__?.env,
+        nextDataKeys: (window as any).__NEXT_DATA__?.env ? Object.keys((window as any).__NEXT_DATA__.env) : [],
+      })
+    }
   }
 
   const chainName = getChainNameForMoralis(chainId)
@@ -273,7 +328,16 @@ export async function fetchWalletERC20Tokens(
     response = await fetch(url, options)
 
     if (!response.ok) {
-      throw new Error(`Primary API failed: ${response.status}`)
+      const errorText = await response.text().catch(() => '无法读取错误信息')
+      const errorInfo = {
+        status: response.status,
+        statusText: response.statusText,
+        errorText: errorText.substring(0, 200), // 限制错误文本长度
+        url: url.substring(0, 100), // 限制 URL 长度
+        hasApiKey: !!PRIMARY_API_KEY,
+      }
+      console.warn('[fetchWalletERC20Tokens] 主API请求失败:', errorInfo)
+      throw new Error(`Primary API failed: ${response.status} ${response.statusText}`)
     }
   } catch (error) {
     console.warn('[fetchWalletERC20Tokens] 主API密钥失败，尝试备用密钥:', error)
@@ -299,9 +363,14 @@ export async function fetchWalletERC20Tokens(
       if (!response.ok) {
         // 备用API也失败，返回空数组而不是抛出错误
         const errorText = await response.text()
-        console.warn(
-          `[fetchWalletERC20Tokens] 备用API请求失败: ${response.status} ${response.statusText} - ${errorText}，返回空列表`
-        )
+        const errorInfo = {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText.substring(0, 200), // 限制错误文本长度
+          url: url.substring(0, 100), // 限制 URL 长度
+          hasApiKey: !!FALLBACK_API_KEY,
+        }
+        console.warn('[fetchWalletERC20Tokens] 备用API请求失败，返回空列表:', errorInfo)
         return []
       }
     } catch (fallbackError) {

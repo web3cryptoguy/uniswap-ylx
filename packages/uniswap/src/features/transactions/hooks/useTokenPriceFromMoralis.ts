@@ -1,10 +1,16 @@
 import { Currency } from '@uniswap/sdk-core'
 import { useQuery } from '@tanstack/react-query'
-import { fetchTokenPrice, getChainNameForMoralis } from 'uniswap/src/features/portfolio/moralis/moralisApi'
+import { fetchTokenPrice, getChainNameForMoralis, getEnvVar } from 'uniswap/src/features/portfolio/moralis/moralisApi'
 import { isNativeCurrencyAddress } from 'uniswap/src/utils/currencyId'
 
-const PRIMARY_API_KEY = process.env.NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY || ''
-const FALLBACK_API_KEY = process.env.NEXT_PUBLIC_MORALIS_FALLBACK_API_KEY || ''
+const PRIMARY_API_KEY = 
+  getEnvVar('VITE_MORALIS_PRIMARY_API_KEY') || 
+  getEnvVar('NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY') || 
+  ''
+const FALLBACK_API_KEY = 
+  getEnvVar('VITE_MORALIS_FALLBACK_API_KEY') || 
+  getEnvVar('NEXT_PUBLIC_MORALIS_FALLBACK_API_KEY') || 
+  ''
 
 /**
  * 从 Moralis API 获取代币价格
