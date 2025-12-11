@@ -314,11 +314,42 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
     customTokensWithPrices.data,
   ])
 
+  // 检查 API 密钥是否配置
+  const getEnvVar = (key: string): string => {
+    try {
+      // @ts-expect-error - import.meta.env is available in Vite runtime
+      if (typeof import.meta !== 'undefined' && import.meta.env?.[key]) {
+        // @ts-expect-error - import.meta.env is available in Vite runtime
+        return import.meta.env[key] as string
+      }
+    } catch {
+      // import.meta not available, fall through to process.env
+    }
+    return process.env[key] || ''
+  }
+  const hasApiKey = !!(
+    getEnvVar('VITE_MORALIS_PRIMARY_API_KEY') || 
+    getEnvVar('NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY') ||
+    getEnvVar('VITE_MORALIS_FALLBACK_API_KEY') || 
+    getEnvVar('NEXT_PUBLIC_MORALIS_FALLBACK_API_KEY')
+  )
+
   // 即使ERC20代币获取失败，也不显示错误，因为可能还有原生代币和自定义代币
   // 只有当所有数据源都失败时才显示错误
+  // 如果 API 密钥未配置，不显示错误（这是配置问题，不是真正的错误）
   const hasAnyData = allTokens.length > 0
+
+  // 如果 API 密钥未配置且没有数据，在控制台输出提示（仅一次）
+  if (!hasApiKey && !hasAnyData && !isLoading && !nativeTokenBalance.isLoading && !nativeTokenQuantity.isLoading) {
+    console.info(
+      '[useMoralisTokenList] 提示: Moralis API 密钥未配置。' +
+      '要显示 ERC20 代币，请在 Vercel 环境变量中配置 NEXT_PUBLIC_MORALIS_PRIMARY_API_KEY。' +
+      '详情请参考 VERCEL_ENV_SETUP.md'
+    )
+  }
   const shouldShowError = 
     !hasAnyData && 
+    hasApiKey && // 只有在 API 密钥已配置时才显示错误
     (error || nativeTokenBalance.error || nativeTokenQuantity.error) &&
     !isLoading &&
     !nativeTokenBalance.isLoading &&
@@ -327,6 +358,7 @@ export function useMoralisTokenList(chainId?: UniverseChainId) {
   return {
     data: allTokens,
     // 只有在没有任何数据且所有请求都完成时才显示错误
+    // 如果 API 密钥未配置，不显示错误（这是配置问题，不是真正的错误）
     error: shouldShowError ? (error || nativeTokenBalance.error || nativeTokenQuantity.error) : undefined,
     isLoading:
       isLoading ||
