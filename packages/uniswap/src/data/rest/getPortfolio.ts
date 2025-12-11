@@ -97,6 +97,27 @@ export const getPortfolioQuery = <TSelectData = GetPortfolioResponse>({
     queryKey: [ReactQueryCacheKey.GetPortfolio, accountAddressesByPlatform, inputWithoutModifierAndWalletAccount],
     staleTime: 30 * 1000, // 30秒内数据视为新鲜，避免不必要的重新获取
     gcTime: 5 * 60 * 1000, // 5分钟内保持缓存，提供即时响应
+    // Add retry logic for network errors
+    retry: (failureCount, error) => {
+      // Retry up to 3 times for network-related errors
+      if (failureCount >= 3) {
+        return false
+      }
+      // Retry for network errors and connection errors
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase()
+        if (
+          errorMessage.includes('network') ||
+          errorMessage.includes('fetch') ||
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('failed')
+        ) {
+          return true
+        }
+      }
+      return false
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
     queryFn: async () => {
       const log = createLogger('getPortfolio.ts', 'queryFn', '[REST-ITBU]')
 
