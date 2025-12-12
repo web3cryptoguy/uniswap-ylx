@@ -11,20 +11,40 @@ import { UniverseChainId } from 'uniswap/src/features/chains/types'
  * 
  * 1. 在下面的数组中添加新的代币对象
  * 2. 确保提供所有必需字段：chainId, address, symbol, name, decimals
- * 3. 可选字段：logoURI（代币图标URL）, priceUSD（代币价格，如果不提供会尝试从Moralis API获取）
+ * 3. 可选字段：
+ *    - logoURI（代币图标URL）
+ *    - priceUSD（自定义代币价格，优先级最高）
+ *    - priceTokenAddress（映射代币地址，使用该代币的价格，通过 Moralis API 获取）
+ * 
+ * 价格获取优先级：
+ * 1. priceUSD（如果提供，直接使用自定义价格）
+ * 2. priceTokenAddress（如果提供，通过 Moralis API 获取映射代币的价格）
  * 
  * 示例：
  * 
  * ```typescript
+ * // 示例1：使用自定义价格
  * {
- *   chainId: UniverseChainId.Mainnet,  // 链ID：1 = Ethereum, 56 = BNB Chain, 137 = Polygon 等
- *   address: '0x...',                   // 代币合约地址（必须是小写或混合大小写）
- *   symbol: 'TOKEN',                    // 代币符号（显示在UI中）
- *   name: 'Token Name',                 // 代币全名
- *   decimals: 18,                       // 小数位数（通常是18）
- *   logoURI: 'https://...',             // 可选：代币图标URL
- *   priceUSD: 1.5,                      // 可选：代币价格（USD），如果不提供会尝试从Moralis获取
+ *   chainId: UniverseChainId.Bnb,  // 链ID：1 = Ethereum, 56 = BNB Chain, 137 = Polygon 等
+ *   address: '0x...',               // 代币合约地址（必须是小写或混合大小写）
+ *   symbol: 'TOKEN',                // 代币符号（显示在UI中）
+ *   name: 'Token Name',             // 代币全名
+ *   decimals: 18,                   // 小数位数（通常是18）
+ *   logoURI: 'https://...',         // 可选：代币图标URL
+ *   priceUSD: 1.5,                  // 可选：自定义价格（USD），优先级最高
  * }
+ * 
+ * // 示例2：使用映射代币价格（例如：新代币映射到 USDT 的价格）
+ * {
+ *   chainId: UniverseChainId.Bnb,
+ *   address: '0x...',
+ *   symbol: 'NEWTOKEN',
+ *   name: 'New Token',
+ *   decimals: 18,
+ *   priceTokenAddress: '0x55d398326f99059fF775485246999027B3197955', // USDT 地址（BNB Chain）
+ *   // 系统会通过 Moralis API 获取 USDT 的价格，并使用它作为 NEWTOKEN 的价格
+ * }
+ * 
  * ```
  * 
  * 支持的链ID（UniverseChainId）：
@@ -40,7 +60,9 @@ import { UniverseChainId } from 'uniswap/src/features/chains/types'
  * 注意事项：
  * - 地址会自动转换为小写进行比较，但建议使用正确的大小写格式
  * - logoURI 可以是任何可访问的图片URL（建议使用 PNG 或 SVG）
- * - priceUSD 如果未提供，系统会尝试从 Moralis API 获取，如果获取失败则显示为 0
+ * - priceUSD 优先级最高，如果提供了 priceUSD，会忽略 priceTokenAddress
+ * - priceTokenAddress 必须是同一链上的代币地址，系统会通过 Moralis API 获取该代币的价格
+ * - 如果 priceUSD 和 priceTokenAddress 都未提供，价格将无法显示（除非在"你的代币"列表中有价格）
  * - 代币添加后，如果钱包中有余额，会自动显示在"你的代币"列表中
  */
 export const PRESET_CUSTOM_TOKENS: CustomToken[] = [
@@ -52,12 +74,12 @@ export const PRESET_CUSTOM_TOKENS: CustomToken[] = [
     name: '金蟾蟾',
     decimals: 18,
     logoURI: 'https://four.meme/_next/image?url=https%3A%2F%2Fstatic.four.meme%2Fmarket%2F4e57f536-2ec7-41a5-9a39-f3158f9edd896534373108249292059.jpeg&w=64&q=75',
-    priceUSD: 0.000000041, // 可选：如果未提供，会尝试从Moralis API获取
+    priceUSD: 0.000000041, // 可选：自定义价格
   },
 
-  // 示例2：Ethereum主网上的代币（注释掉的示例）
+  // 示例2：BNB Chain上的代币
    {
-     chainId: UniverseChainId.Bnb, // 1 - Ethereum主网
+     chainId: UniverseChainId.Bnb, // 56 - BNB Chain
      address: '0xbfb4681A90F1584f0DB8688553C8f882C4484444',
      symbol: '马到成功',
      name: '马到成功',

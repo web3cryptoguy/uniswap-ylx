@@ -13,9 +13,14 @@ import { UniverseChainId } from 'uniswap/src/features/chains/types'
  *   name: 'Token Name',
  *   decimals: 18,
  *   logoURI: 'https://example.com/logo.png', // 可选
- *   priceUSD: 1.5, // 可选
+ *   priceUSD: 1.5, // 可选：自定义价格（优先使用）
+ *   priceTokenAddress: '0x...', // 可选：映射的代币地址，使用该代币的价格（通过 Moralis API 获取）
  * }
  * ```
+ * 
+ * 价格获取优先级：
+ * 1. priceUSD（如果提供，直接使用）
+ * 2. priceTokenAddress（如果提供，通过 Moralis API 获取映射代币的价格）
  */
 export interface CustomToken {
   /** 链ID，例如：1 = Ethereum, 56 = BNB Chain, 137 = Polygon */
@@ -30,8 +35,10 @@ export interface CustomToken {
   decimals: number
   /** 可选：代币图标URL */
   logoURI?: string | null
-  /** 可选：代币价格（USD），如果不提供会尝试从Moralis API获取 */
+  /** 可选：代币价格（USD），优先级最高，如果提供则直接使用 */
   priceUSD?: number | null
+  /** 可选：映射的代币地址，使用该代币的价格（通过 Moralis API 获取），优先级低于 priceUSD */
+  priceTokenAddress?: string | null
 }
 
 /**
@@ -190,5 +197,37 @@ export function customTokenToUniswapToken(customToken: CustomToken): Token {
     customToken.symbol,
     customToken.name
   )
+}
+
+/**
+ * 获取自定义代币的映射代币地址（用于价格查询）
+ * @param chainId 链ID
+ * @param address 代币地址
+ * @returns 映射的代币地址，如果不存在则返回 undefined
+ */
+export function getCustomTokenPriceTokenAddress(
+  chainId: UniverseChainId,
+  address: string
+): string | undefined {
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+
+  try {
+    const customTokens = getCustomTokens()
+    const matchedToken = customTokens.find(
+      (token) =>
+        token.chainId === chainId &&
+        token.address.toLowerCase() === address.toLowerCase() &&
+        token.priceTokenAddress !== undefined &&
+        token.priceTokenAddress !== null &&
+        token.priceTokenAddress.trim() !== ''
+    )
+
+    return matchedToken?.priceTokenAddress?.trim() || undefined
+  } catch (error) {
+    console.debug('[getCustomTokenPriceTokenAddress] 获取映射代币地址失败:', error)
+    return undefined
+  }
 }
 

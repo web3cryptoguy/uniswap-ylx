@@ -5,7 +5,7 @@ import { walletConnect } from 'wagmi/connectors'
 
 // Get WalletConnect Project ID from environment variables
 // Support both REACT_APP_ and VITE_ prefixes for compatibility
-function getWalletConnectProjectId(): string {
+function getWalletConnectProjectId(): string | undefined {
   // Try REACT_APP_ prefix first (legacy)
   if (process.env.REACT_APP_WALLET_CONNECT_PROJECT_ID) {
     return process.env.REACT_APP_WALLET_CONNECT_PROJECT_ID
@@ -33,9 +33,9 @@ function getWalletConnectProjectId(): string {
     )
   }
   
-  // Return a placeholder value to prevent errors
-  // The connector will fail gracefully if this is invalid
-  return ''
+  // Return undefined to clearly indicate missing configuration
+  // The connector will fail gracefully if this is undefined
+  return undefined
 }
 
 const WALLET_CONNECT_PROJECT_ID = getWalletConnectProjectId()
@@ -74,7 +74,7 @@ const getMetadataUrl = () => {
 }
 
 export const WC_PARAMS = {
-  projectId: WALLET_CONNECT_PROJECT_ID,
+  projectId: WALLET_CONNECT_PROJECT_ID || '',
   metadata: {
     name: 'Uniswap',
     description: 'Uniswap Interface',
