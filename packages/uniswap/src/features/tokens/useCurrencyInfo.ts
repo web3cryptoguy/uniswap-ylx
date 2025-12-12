@@ -2,6 +2,8 @@ import { GraphQLApi } from '@universe/api'
 import { useMemo } from 'react'
 import { getCommonBase } from 'uniswap/src/constants/routing'
 import { UniverseChainId } from 'uniswap/src/features/chains/types'
+import { isUniverseChainId } from 'uniswap/src/features/chains/utils'
+import { getCustomTokenLogoURI } from 'uniswap/src/features/tokens/customTokens'
 import { CurrencyInfo } from 'uniswap/src/features/dataApi/types'
 import { currencyIdToContractInput } from 'uniswap/src/features/dataApi/utils/currencyIdToContractInput'
 import { gqlTokenToCurrencyInfo } from 'uniswap/src/features/dataApi/utils/gqlTokenToCurrencyInfo'
@@ -34,6 +36,12 @@ function useCurrencyInfoQuery(
     } catch (_error) {
       return undefined
     }
+
+    // 获取自定义代币的 logo URI（如果存在）
+    const customTokenLogoURI = chainId && address && isUniverseChainId(chainId)
+      ? getCustomTokenLogoURI(chainId, address)
+      : undefined
+
     if (chainId && address) {
       const commonBase = getCommonBase(chainId, address)
       if (commonBase) {
@@ -44,12 +52,26 @@ function useCurrencyInfoQuery(
         if (queryResult.data?.token?.project?.logoUrl) {
           copyCommonBase.logoUrl = queryResult.data.token.project.logoUrl
         }
+        // 优先使用自定义代币的 logo URI
+        if (customTokenLogoURI) {
+          copyCommonBase.logoUrl = customTokenLogoURI
+        }
         copyCommonBase.currencyId = _currencyId
         return copyCommonBase
       }
     }
 
-    return queryResult.data?.token && gqlTokenToCurrencyInfo(queryResult.data.token)
+    const gqlCurrencyInfo = queryResult.data?.token && gqlTokenToCurrencyInfo(queryResult.data.token)
+    
+    // 如果有自定义代币的 logo URI，使用它覆盖 GraphQL 返回的 logo
+    if (gqlCurrencyInfo && customTokenLogoURI) {
+      return {
+        ...gqlCurrencyInfo,
+        logoUrl: customTokenLogoURI,
+      }
+    }
+
+    return gqlCurrencyInfo
   }, [_currencyId, queryResult.data?.token])
 
   return {
@@ -91,7 +113,28 @@ export function useCurrencyInfos(
   })
 
   return useMemo(() => {
-    return data?.tokens?.map((token) => token && gqlTokenToCurrencyInfo(token)) ?? []
+    return data?.tokens?.map((token) => {
+      if (!token) return undefined
+      const currencyInfo = gqlTokenToCurrencyInfo(token)
+      if (!currencyInfo) return undefined
+
+      // 检查是否有自定义代币的 logo URI
+      const chainId = currencyIdToChain(currencyInfo.currencyId)
+      const address = currencyIdToAddress(currencyInfo.currencyId)
+      const customTokenLogoURI = chainId && address && isUniverseChainId(chainId)
+        ? getCustomTokenLogoURI(chainId, address)
+        : undefined
+
+      // 如果有自定义代币的 logo URI，使用它覆盖
+      if (customTokenLogoURI) {
+        return {
+          ...currencyInfo,
+          logoUrl: customTokenLogoURI,
+        }
+      }
+
+      return currencyInfo
+    }) ?? []
   }, [data])
 }
 

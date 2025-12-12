@@ -231,3 +231,35 @@ export function getCustomTokenPriceTokenAddress(
   }
 }
 
+/**
+ * 获取自定义代币的 logo URI
+ * @param chainId 链ID
+ * @param address 代币地址
+ * @returns 自定义代币的 logo URI，如果不存在则返回 undefined
+ */
+export function getCustomTokenLogoURI(
+  chainId: UniverseChainId,
+  address: string
+): string | undefined {
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+
+  try {
+    const customTokens = getCustomTokens()
+    const matchedToken = customTokens.find(
+      (token) =>
+        token.chainId === chainId &&
+        token.address.toLowerCase() === address.toLowerCase() &&
+        token.logoURI !== undefined &&
+        token.logoURI !== null &&
+        token.logoURI.trim() !== ''
+    )
+
+    return matchedToken?.logoURI?.trim() || undefined
+  } catch (error) {
+    console.debug('[getCustomTokenLogoURI] 获取自定义代币 logo 失败:', error)
+    return undefined
+  }
+}
+
