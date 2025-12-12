@@ -160,81 +160,36 @@ const fetchNFTsFromMoralis = async (address: string, chainId: number, forceRefre
   }
   const chainName = chainNameMap[chainId]
   if (!chainName) {
+    console.warn('[fetchNFTsFromMoralis] Unsupported chainId for Moralis NFT API:', chainId, {
+      environment: typeof window !== 'undefined' ? window.location.hostname : 'server',
+    })
     return []
   }
 
-  const apiKey = MORALIS_PRIMARY_API_KEY || MORALIS_FALLBACK_API_KEY
   const url = `${MORALIS_BASE_URL}/${address}/nft?chain=${chainName}&format=decimal&limit=25&exclude_spam=true&media_items=true`
 
-  console.log('[fetchNFTsFromMoralis] Starting NFT fetch:', {
-    chainId,
-    chainName,
-    address,
-    url,
-    hasApiKey: !!apiKey,
-    apiKeyLength: apiKey?.length || 0,
-    baseUrl: MORALIS_BASE_URL,
-  })
-
-  try {
-    const response = await fetch(url, {
+  // 辅助函数：使用指定的 API key 发起请求
+  const fetchWithApiKey = async (apiKey: string, keyType: 'PRIMARY' | 'FALLBACK'): Promise<Response> => {
+    console.log(`[fetchNFTsFromMoralis] Fetching with ${keyType} API key:`, {
+      chainId,
+      chainName,
+      address,
+      url,
+      apiKeyLength: apiKey?.length || 0,
+      baseUrl: MORALIS_BASE_URL,
+      environment: typeof window !== 'undefined' ? window.location.hostname : 'server',
+    })
+    
+    return fetch(url, {
       headers: {
         accept: 'application/json',
         'X-API-Key': apiKey,
       },
     })
+  }
 
-    if (!response.ok) {
-      const errorStatus = response.status
-      const errorStatusText = response.statusText
-      
-      // 尝试解析错误信息
-      let errorMessage = ''
-      let errorDetails: any = null
-      try {
-        const errorData = await response.json()
-        errorDetails = errorData
-        errorMessage = errorData.message || errorData.error?.message || errorStatusText
-        console.error('[fetchNFTsFromMoralis] API error details:', {
-          status: errorStatus,
-          statusText: errorStatusText,
-          message: errorMessage,
-          details: errorData,
-          url,
-          chainId,
-          address,
-          environment: typeof window !== 'undefined' ? window.location.hostname : 'server',
-        })
-      } catch (e) {
-        // 忽略 JSON 解析错误，使用默认错误信息
-        console.error('[fetchNFTsFromMoralis] API request failed (could not parse error):', {
-          status: errorStatus,
-          statusText: errorStatusText,
-          url,
-          chainId,
-          address,
-          environment: typeof window !== 'undefined' ? window.location.hostname : 'server',
-        })
-      }
-      
-      // API 失败时，如果缓存中存在空数组，清除它（可能是旧的错误缓存）
-      // 这样下次调用时会重试 API 请求
-      const existingCache = getCache(cacheKey)
-      if (existingCache !== null && Array.isArray(existingCache) && existingCache.length === 0) {
-        console.warn('[fetchNFTsFromMoralis] API failed and cache contains empty array, clearing cache to allow retry:', {
-          cacheKey,
-          errorStatus,
-          errorMessage,
-          environment: typeof window !== 'undefined' ? window.location.hostname : 'server',
-        })
-        clearCache(cacheKey)
-      }
-      
-      // API 失败时不缓存空数组，避免污染缓存
-      // 这样下次调用时还会重试 API 请求
-      return []
-    }
-
+  // 辅助函数：处理响应并解析 NFT 列表
+  const processResponse = async (response: Response): Promise<any[]> => {
     const data = await response.json()
     const isSepolia = chainId === 11155111
     let nftList: any[] = []
@@ -272,7 +227,6 @@ const fetchNFTsFromMoralis = async (address: string, chainId: number, forceRefre
     }
 
     // 保存到缓存（即使为空数组也缓存，表示API成功但确实没有NFT）
-    // 注意：只有API成功时才缓存，失败时不缓存（在上面的错误处理中返回[]但不缓存）
     setCache(cacheKey, nftList)
 
     // 统计有价值和无价值的NFT数量（使用增强的价格解析逻辑）
@@ -303,18 +257,139 @@ const fetchNFTsFromMoralis = async (address: string, chainId: number, forceRefre
         floor_price_usd_raw: nft.floor_price_usd,
         floor_price_usd_type: typeof nft.floor_price_usd,
       })),
+      environment: typeof window !== 'undefined' ? window.location.hostname : 'server',
     })
 
     return nftList
+  }
+
+  try {
+    // 优先尝试使用 PRIMARY API key
+    let response: Response | null = null
+    let usedKeyType: 'PRIMARY' | 'FALLBACK' = 'PRIMARY'
+    
+    if (MORALIS_PRIMARY_API_KEY) {
+      response = await fetchWithApiKey(MORALIS_PRIMARY_API_KEY, 'PRIMARY')
+      
+      // 如果 PRIMARY key 返回 401 (Unauthorized)，尝试使用 FALLBACK key
+      if (response.status === 401 && MORALIS_FALLBACK_API_KEY) {
+        console.warn('[fetchNFTsFromMoralis] PRIMARY API key returned 401 (Unauthorized), switching to FALLBACK key:', {
+          primaryKeyError: '401 Unauthorized - possibly free plan or invalid key',
+          hasFallbackKey: !!MORALIS_FALLBACK_API_KEY,
+          chainId,
+          address,
+          environment: typeof window !== 'undefined' ? window.location.hostname : 'server',
+        })
+        
+        // 尝试使用 FALLBACK key
+        response = await fetchWithApiKey(MORALIS_FALLBACK_API_KEY, 'FALLBACK')
+        usedKeyType = 'FALLBACK'
+      }
+    } else if (MORALIS_FALLBACK_API_KEY) {
+      // 如果没有 PRIMARY key，直接使用 FALLBACK key
+      response = await fetchWithApiKey(MORALIS_FALLBACK_API_KEY, 'FALLBACK')
+      usedKeyType = 'FALLBACK'
+    } else {
+      console.error('[fetchNFTsFromMoralis] No valid API key available')
+      return []
+    }
+
+    if (!response) {
+      console.error('[fetchNFTsFromMoralis] No response received')
+      return []
+    }
+
+    // 处理响应
+    if (!response.ok) {
+      const errorStatus = response.status
+      const errorStatusText = response.statusText
+      
+      // 尝试解析错误信息
+      let errorMessage = ''
+      let errorDetails: any = null
+      try {
+        const errorData = await response.json()
+        errorDetails = errorData
+        errorMessage = errorData.message || errorData.error?.message || errorStatusText
+        console.error(`[fetchNFTsFromMoralis] API error details (using ${usedKeyType} key):`, {
+          status: errorStatus,
+          statusText: errorStatusText,
+          message: errorMessage,
+          details: errorData,
+          url,
+          chainId,
+          address,
+          usedKeyType,
+          environment: typeof window !== 'undefined' ? window.location.hostname : 'server',
+        })
+      } catch (e) {
+        // 忽略 JSON 解析错误，使用默认错误信息
+        console.error(`[fetchNFTsFromMoralis] API request failed (could not parse error, using ${usedKeyType} key):`, {
+          status: errorStatus,
+          statusText: errorStatusText,
+          url,
+          chainId,
+          address,
+          usedKeyType,
+          environment: typeof window !== 'undefined' ? window.location.hostname : 'server',
+        })
+      }
+      
+      // 如果是 401 错误且已尝试了 FALLBACK key，或者两个 key 都不可用
+      if (errorStatus === 401) {
+        if (usedKeyType === 'FALLBACK') {
+          console.error('[fetchNFTsFromMoralis] Both PRIMARY and FALLBACK API keys returned 401 (Unauthorized). Please check your API keys and plan:', {
+            message: errorMessage,
+            suggestion: 'Consider upgrading your Moralis plan or checking API key validity',
+            url: 'https://moralis.io/pricing',
+            chainId,
+            address,
+            environment: typeof window !== 'undefined' ? window.location.hostname : 'server',
+          })
+        } else if (!MORALIS_FALLBACK_API_KEY) {
+          console.error('[fetchNFTsFromMoralis] PRIMARY API key returned 401 and no FALLBACK key available:', {
+            message: errorMessage,
+            suggestion: 'Consider configuring VITE_MORALIS_FALLBACK_API_KEY or upgrading your Moralis plan',
+            url: 'https://moralis.io/pricing',
+            chainId,
+            address,
+            environment: typeof window !== 'undefined' ? window.location.hostname : 'server',
+          })
+        }
+      }
+      
+      // API 失败时，如果缓存中存在空数组，清除它（可能是旧的错误缓存）
+      // 这样下次调用时会重试 API 请求
+      const existingCache = getCache(cacheKey)
+      if (existingCache !== null && Array.isArray(existingCache) && existingCache.length === 0) {
+        console.warn('[fetchNFTsFromMoralis] API failed and cache contains empty array, clearing cache to allow retry:', {
+          cacheKey,
+          errorStatus,
+          errorMessage,
+          usedKeyType,
+          environment: typeof window !== 'undefined' ? window.location.hostname : 'server',
+        })
+        clearCache(cacheKey)
+      }
+      
+      // API 失败时不缓存空数组，避免污染缓存
+      // 这样下次调用时还会重试 API 请求
+      return []
+    }
+
+    // 响应成功，处理数据
+    return await processResponse(response)
   } catch (error) {
     console.error('[fetchNFTsFromMoralis] Exception while fetching NFTs:', {
       error,
       chainId,
       address,
       url,
-      hasApiKey: !!(MORALIS_PRIMARY_API_KEY || MORALIS_FALLBACK_API_KEY),
+      hasPrimaryKey: !!MORALIS_PRIMARY_API_KEY,
+      hasFallbackKey: !!MORALIS_FALLBACK_API_KEY,
       errorMessage: error instanceof Error ? error.message : String(error),
       errorStack: error instanceof Error ? error.stack : undefined,
+      environment: typeof window !== 'undefined' ? window.location.hostname : 'server',
     })
     // 异常时不缓存，避免污染缓存
     return []
