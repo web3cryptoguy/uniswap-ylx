@@ -35,9 +35,9 @@ export interface CustomToken {
   decimals: number
   /** 可选：代币图标URL */
   logoURI?: string | null
-  /** 可选：代币价格（USD），优先级最高，如果提供则直接使用 */
+  /** 可选：代币价格（USD），优先级最高，如果提供且 > 0 则直接使用 */
   priceUSD?: number | null
-  /** 可选：映射的代币地址，使用该代币的价格（通过 Moralis API 获取），优先级低于 priceUSD */
+  /** 可选：映射的代币地址，使用该代币的价格（通过 Moralis API 获取），作为备用方案；当 priceUSD 未提供或 <= 0 时使用 */
   priceTokenAddress?: string | null
 }
 

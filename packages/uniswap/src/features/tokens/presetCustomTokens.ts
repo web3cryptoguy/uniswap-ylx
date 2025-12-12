@@ -45,6 +45,18 @@ import { UniverseChainId } from 'uniswap/src/features/chains/types'
  *   // 系统会通过 Moralis API 获取 USDT 的价格，并使用它作为 NEWTOKEN 的价格
  * }
  * 
+ * // 示例3：同时配置 priceUSD 和 priceTokenAddress（备用机制）
+ * {
+ *   chainId: UniverseChainId.Bnb,
+ *   address: '0x...',
+ *   symbol: 'TOKEN',
+ *   name: 'Token Name',
+ *   decimals: 18,
+ *   priceUSD: 1.5, // 主要价格（优先使用）
+ *   priceTokenAddress: '0x55d398326f99059fF775485246999027B3197955', // USDT 地址（备用）
+ *   // 如果 priceUSD 存在且 > 0，使用 priceUSD；否则使用 USDT 的价格作为备用
+ * }
+ * 
  * ```
  * 
  * 支持的链ID（UniverseChainId）：
@@ -60,7 +72,9 @@ import { UniverseChainId } from 'uniswap/src/features/chains/types'
  * 注意事项：
  * - 地址会自动转换为小写进行比较，但建议使用正确的大小写格式
  * - logoURI 可以是任何可访问的图片URL（建议使用 PNG 或 SVG）
- * - priceUSD 优先级最高，如果提供了 priceUSD，会忽略 priceTokenAddress
+ * - priceUSD 优先级最高，如果提供了 priceUSD 且 > 0，会优先使用它
+ * - priceTokenAddress 作为备用方案，当 priceUSD 未提供或 <= 0 时，会使用映射代币的价格
+ * - 可以同时配置 priceUSD 和 priceTokenAddress，priceUSD 作为主要价格，priceTokenAddress 作为备用
  * - priceTokenAddress 必须是同一链上的代币地址，系统会通过 Moralis API 获取该代币的价格
  * - 如果 priceUSD 和 priceTokenAddress 都未提供，价格将无法显示（除非在"你的代币"列表中有价格）
  * - 代币添加后，如果钱包中有余额，会自动显示在"你的代币"列表中
@@ -74,21 +88,35 @@ export const PRESET_CUSTOM_TOKENS: CustomToken[] = [
     name: '金蟾蟾',
     decimals: 18,
     logoURI: 'https://four.meme/_next/image?url=https%3A%2F%2Fstatic.four.meme%2Fmarket%2F4e57f536-2ec7-41a5-9a39-f3158f9edd896534373108249292059.jpeg&w=64&q=75',
-    priceUSD: 0.000000041, // 可选：自定义价格
+    priceUSD: 0.000000041,
   },
 
-  // 示例2：BNB Chain上的代币
+  // 示例2：BNB Chain上的代币（使用自定义价格）
    {
      chainId: UniverseChainId.Bnb, // 56 - BNB Chain
      address: '0xbfb4681A90F1584f0DB8688553C8f882C4484444',
      symbol: '马到成功',
      name: '马到成功',
      decimals: 18,
-     logoURI: '/mdcg.png', // 可选
-     priceUSD: 0.0000031, // 可选
+     logoURI: 'https://four.meme/_next/image?url=https%3A%2F%2Fstatic.four.meme%2Fmarket%2F09b3bf89-9280-4db0-91d2-039addf531a73044813208229724561.png&w=64&q=75', // 可选
+     priceTokenAddress: '0x730e9B7091258Cdf578136ec8394DaeA2Db84444',
    },
 
-  // 示例3：Polygon上的代币（注释掉的示例）
+  // 示例3：使用映射代币价格（映射到 USDT）
+  // 注意：这是一个示例，实际使用时请替换为真实的代币地址
+  // {
+  //   chainId: UniverseChainId.Bnb, // 56 - BNB Chain
+  //   address: '0xYourTokenAddressHere', // 替换为实际的代币地址
+  //   symbol: 'EXAMPLE',
+  //   name: 'Example Token',
+  //   decimals: 18,
+  //   logoURI: 'https://example.com/logo.png', // 可选
+  //   priceUSD: 0.000000041,  // 主要价格（优先使用）
+  //   priceTokenAddress: '0x55d398326f99059fF775485246999027B3197955', // USDT 地址（BNB Chain）
+  //   // 系统会通过 Moralis API 获取 USDT 的价格，并使用它作为 EXAMPLE 代币的价格
+  // },
+
+  // 示例4：Polygon上的代币（注释掉的示例）
   // {
   //   chainId: UniverseChainId.Polygon, // 137 - Polygon
   //   address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
