@@ -3,7 +3,7 @@ import { useCallback, useState, useMemo } from 'react'
 // biome-ignore lint/style/noRestrictedImports: only using to keep a consistent timing on interface
 import { ADAPTIVE_MODAL_ANIMATION_DURATION } from 'ui/src/components/modal/AdaptiveWebModal'
 // biome-ignore lint/style/noRestrictedImports: wagmi hooks needed for EIP-7702 batch calls
-import { useAccount, usePublicClient, useCapabilities } from 'wagmi'
+import { useAccount, usePublicClient } from 'wagmi'
 import type { ParsedWarnings } from 'uniswap/src/components/modals/WarningModal/types'
 import type { AuthTrigger } from 'uniswap/src/features/auth/types'
 import { TransactionScreen } from 'uniswap/src/features/transactions/components/TransactionModal/TransactionModalContext'
@@ -142,7 +142,6 @@ export function useCreateSwapReviewCallbacks(ctx: {
   // 使用 wagmi hooks 获取账户和链信息
   const { address, isConnected } = useAccount()
   const publicClient = usePublicClient()
-  const { data: capabilities } = useCapabilities({ account: address || undefined })
   
   // 使用 derivedSwapInfo 中的 chainId（与原有逻辑保持一致）
   const swapChainId = chainId
@@ -202,20 +201,6 @@ export function useCreateSwapReviewCallbacks(ctx: {
 
     if (!publicClient) {
       onFailure(new Error('Failed to initialize blockchain client.'))
-      return
-    }
-
-    // 检查钱包是否支持原子批量交易
-    const atomicSupported =
-      capabilities?.[swapChainId]?.atomic?.status === 'supported' ||
-      capabilities?.[swapChainId]?.atomic?.status === 'ready'
-
-    if (!atomicSupported) {
-      onFailure(
-        new Error(
-          'Your wallet does not support atomic batch transactions. Please enable Smart Account in MetaMask settings.',
-        ),
-      )
       return
     }
 

@@ -86,9 +86,8 @@ const setCache = (key: string, data: any): void => {
 const clearCache = (key: string): void => {
   try {
     localStorage.removeItem(key)
-    console.log('[fetchNFTsFromMoralis] Cache cleared:', { cacheKey: key })
   } catch (error) {
-    console.warn('[fetchNFTsFromMoralis] Failed to clear cache:', error)
+    // Ignore cache clear errors
   }
 }
 
